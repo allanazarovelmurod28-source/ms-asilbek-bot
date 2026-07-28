@@ -29,30 +29,38 @@ router = Router()
 # ---------------------------------------------------------------------------
 
 def build_subscribe_keyboard() -> InlineKeyboardMarkup:
-    """Kanallarga obuna bo'lish + tasdiqlash tugmalari"""
+    """Kanallarga obuna bo'lish + tasdiqlash tugmalari (haqiqiy rang va custom emoji bilan)"""
     buttons = []
-    for i, ch in enumerate(config.CHANNELS, start=1):
-        color = "🔵" if i == 1 else "🟢"
+    styles = ["primary", "success"]  # 1-kanal ko'k, 2-kanal yashil
+    for i, ch in enumerate(config.CHANNELS):
         buttons.append(
-            [InlineKeyboardButton(text=f"{color} {i}-kanalga obuna bo'lish", url=ch["url"])]
+            [
+                InlineKeyboardButton(
+                    text=f"{i + 1}-kanalga obuna bo'lish",
+                    url=ch["url"],
+                    icon_custom_emoji_id=ch["emoji_id"],
+                    style=styles[i],
+                )
+            ]
         )
     buttons.append(
-        [InlineKeyboardButton(text="🔴 Tasdiqlash", callback_data="check_subscription")]
+        [
+            InlineKeyboardButton(
+                text="Tasdiqlash",
+                callback_data="check_subscription",
+                icon_custom_emoji_id=config.CONFIRM_EMOJI_ID,
+                style="danger",
+            )
+        ]
     )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def build_subscribe_text() -> str:
-    """Custom emoji bilan matn (HTML tg-emoji tegi orqali)"""
     lines = ["<b>Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:</b>\n"]
-    for ch in config.CHANNELS:
-        lines.append(
-            f'<tg-emoji emoji-id="{ch["emoji_id"]}">🔵</tg-emoji> {ch["title"]}'
-        )
-    lines.append(
-        f'\n<tg-emoji emoji-id="{config.CONFIRM_EMOJI_ID}">✅</tg-emoji> '
-        f"Obuna bo'lgach, pastdagi <b>Tasdiqlash</b> tugmasini bosing."
-    )
+    for i, ch in enumerate(config.CHANNELS, start=1):
+        lines.append(f"{i}. {ch['title']}")
+    lines.append("\nObuna bo'lgach, pastdagi <b>Tasdiqlash</b> tugmasini bosing.")
     return "\n".join(lines)
 
 
