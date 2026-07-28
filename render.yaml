@@ -1,0 +1,16 @@
+services:
+  - type: worker
+    name: ms-asilbek-bot
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python bot.py"
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_CHAT_ID
+        value: "7924605766"
+      - key: GROUP_CHAT_ID
+        sync: false
+      - key: STATIC_GROUP_LINK
+        sync: false
