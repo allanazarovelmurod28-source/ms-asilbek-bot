@@ -1,57 +1,63 @@
-import sqlite3
-import threading
-from config import DB_PATH
+import logging
+import psycopg2
+import psycopg2.extras
 
-_lock = threading.Lock()
+import config
+
+log = logging.getLogger("storage")
 
 
 def get_conn():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return psycopg2.connect(config.DATABASE_URL)
 
 
 def init_db():
-    with _lock, get_conn() as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY,
-                username TEXT,
-                full_name TEXT,
-                referrer_id INTEGER,
-                is_verified INTEGER DEFAULT 0,
-                referral_counted INTEGER DEFAULT 0,
-                group_link_sent INTEGER DEFAULT 0,
-                referral_count INTEGER DEFAULT 0,
-                joined_at TEXT DEFAULT CURRENT_TIMESTAMP
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id BIGINT PRIMARY KEY,
+                    username TEXT,
+                    full_name TEXT,
+                    referrer_id BIGINT,
+                    is_verified BOOLEAN DEFAULT FALSE,
+                    referral_counted BOOLEAN DEFAULT FALSE,
+                    group_link_sent BOOLEAN DEFAULT FALSE,
+                    referral_count INTEGER DEFAULT 0,
+                    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
             )
-            """
-        )
         conn.commit()
+    log.info("Baza (Supabase/PostgreSQL) tayyor")
 
 
-def add_user_if_not_exists(user_id: int, username: str, full_name: str, referrer_id: int | None):
-    with _lock, get_conn() as conn:
-        row = conn.execute("SELECT user_id FROM users WHERE user_id=?", (user_id,)).fetchone()
-        if row:
-            return False
-        conn.execute(
-            "INSERT INTO users (user_id, username, full_name, referrer_id) VALUES (?, ?, ?, ?)",
-            (user_id, username, full_name, referrer_id),
-        )
+def add_user_if_not_exists(user_id: int, username: str, full_name: str, referrer_id):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT user_id FROM users WHERE user_id=%s", (user_id,))
+            if cur.fetchone():
+                return False
+            cur.execute(
+                "INSERT INTO users (user_id, username, full_name, referrer_id) VALUES (%s, %s, %s, %s)",
+                (user_id, username, full_name, referrer_id),
+            )
         conn.commit()
         return True
 
 
 def get_user(user_id: int):
-    with _lock, get_conn() as conn:
-        return conn.execute("SELECT * FROM users WHERE user_id=?", (user_id,)).fetchone()
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM users WHERE user_id=%s", (user_id,))
+            return cur.fetchone()
 
 
 def mark_verified(user_id: int):
-    with _lock, get_conn() as conn:
-        conn.execute("UPDATE users SET is_verified=1 WHERE user_id=?", (user_id,))
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET is_verified=TRUE WHERE user_id=%s", (user_id,))
         conn.commit()
 
 
@@ -71,27 +77,32 @@ def count_referral_once(user_id: int):
         return None, None
 
     referrer_id = user["referrer_id"]
-    with _lock, get_conn() as conn:
-        conn.execute("UPDATE users SET referral_counted=1 WHERE user_id=?", (user_id,))
-        conn.execute(
-            "UPDATE users SET referral_count = referral_count + 1 WHERE user_id=?",
-            (referrer_id,),
-        )
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("UPDATE users SET referral_counted=TRUE WHERE user_id=%s", (user_id,))
+            cur.execute(
+                "UPDATE users SET referral_count = referral_count + 1 WHERE user_id=%s",
+                (referrer_id,),
+            )
+            cur.execute(
+                "SELECT referral_count FROM users WHERE user_id=%s", (referrer_id,)
+            )
+            row = cur.fetchone()
+            new_count = row["referral_count"] if row else None
         conn.commit()
-        row = conn.execute(
-            "SELECT referral_count FROM users WHERE user_id=?", (referrer_id,)
-        ).fetchone()
-        new_count = row["referral_count"] if row else None
         return referrer_id, new_count
 
 
 def mark_group_link_sent(user_id: int):
-    with _lock, get_conn() as conn:
-        conn.execute("UPDATE users SET group_link_sent=1 WHERE user_id=?", (user_id,))
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET group_link_sent=TRUE WHERE user_id=%s", (user_id,))
         conn.commit()
 
 
 def total_users() -> int:
-    with _lock, get_conn() as conn:
-        row = conn.execute("SELECT COUNT(*) as c FROM users").fetchone()
-        return row["c"] if row else 0
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT COUNT(*) as c FROM users")
+            row = cur.fetchone()
+            return row["c"] if row else 0
