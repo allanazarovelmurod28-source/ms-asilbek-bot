@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import os
 
+from aiohttp import web
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode, ChatMemberStatus
@@ -240,6 +242,23 @@ async def cb_my_stats(callback: CallbackQuery):
 # Ishga tushirish
 # ---------------------------------------------------------------------------
 
+async def handle_health(request: web.Request):
+    """Render (yoki UptimeRobot) shu manzilga so'rov yuborib, botni 'uyg'oq' saqlaydi."""
+    return web.Response(text="MS Asilbek bot ishlayapti ✅")
+
+
+async def start_web_server():
+    """Render Web Service $PORT talab qiladi - shuning uchun kichik HTTP server ochamiz."""
+    app = web.Application()
+    app.router.add_get("/", handle_health)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.getenv("PORT", 10000))
+    site = web.TCPSite(runner, host="0.0.0.0", port=port)
+    await site.start()
+    log.info("Health-check server %s portda ishga tushdi", port)
+
+
 async def main():
     storage.init_db()
     bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -248,6 +267,9 @@ async def main():
 
     log.info("Bot ishga tushdi...")
     await bot.delete_webhook(drop_pending_updates=True)
+
+    # HTTP server (Render uchun) va Telegram polling'ni PARALLEL ishga tushiramiz
+    await start_web_server()
     await dp.start_polling(bot)
 
 
