@@ -3,8 +3,13 @@ import os
 # Bot tokeni - Render'da Environment Variable sifatida beriladi
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8622464674:AAHhMWetz7ZUFNjTEJw9khK7JGjElSRwdGQ")
 
-# Admin (siz)ning chat ID'ingiz - yangi referal, statistika kabi bildirishnomalar shu yerga boradi
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "7924605766"))
+# Adminlar (siz va boshqa xodimlar)ning chat ID'lari - vergul bilan ajratib bir nechtasini yozish mumkin
+# Masalan Render'da: ADMIN_CHAT_IDS = 7924605766,123456789,987654321
+ADMIN_CHAT_IDS = [
+    int(x.strip())
+    for x in os.getenv("ADMIN_CHAT_IDS", "7924605766").split(",")
+    if x.strip()
+]
 
 # Majburiy obuna kanallari: (username, custom_emoji_id, ko'rinadigan nom)
 CHANNELS = [
@@ -37,5 +42,6 @@ GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID", "")  # masalan: -1001234567890
 # Agar GROUP_CHAT_ID berilmasa, hammaga shu statik havola yuboriladi
 STATIC_GROUP_LINK = os.getenv("STATIC_GROUP_LINK", "https://t.me/+SIZNING_GURUH_HAVOLANGIZ")
 
-# Ma'lumotlar saqlanadigan fayl (SQLite)
-DB_PATH = os.getenv("DB_PATH", "referral_bot.db")
+# Ma'lumotlar saqlanadigan joy - Supabase (PostgreSQL) ulanish manzili
+# Render'da Environment Variable sifatida beriladi (Supabase'dan olinadi)
+DATABASE_URL = os.getenv("DATABASE_URL", "")
